@@ -73,4 +73,6 @@ abstract class AppStrings {
   // ── FCM topics ───────────────────────────────────────────
   static const String fcmTopicAnnouncements = 'class_announcements';
   static const String fcmTopicMaterials     = 'class_materials';
+  static const String fcmTopicTasks         = 'class_tasks';
+  static const String fcmTopicTimetable     = 'class_timetable';
 }

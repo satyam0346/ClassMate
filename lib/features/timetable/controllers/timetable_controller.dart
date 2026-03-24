@@ -6,6 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/services/auth_service.dart';
 import '../../../core/services/firestore_service.dart';
 import '../../../shared/models/timetable_model.dart';
+import '../../../core/services/fcm_server_service.dart';
+import '../../../core/constants/app_strings.dart';
 
 // ── Constants ─────────────────────────────────────────────────
 
@@ -189,35 +191,13 @@ class TimetableController extends StateNotifier<TimetableCrudState> {
         'fcmSent':       true,
       });
 
-      // 2. Broadcast via FCM (Free Topic Messaging)
-      final idToken   = await AuthService.instance.getIdToken(forceRefresh: true);
-      final projectId = dotenv.env['FIREBASE_PROJECT_ID'] ?? '';
-      
-      var notificationBody = body;
-      // Note: we don't have the slot object here easily, but we can 
-      // improve the body before calling _notifyUpdate in addSlot/editSlot 
-      // instead. I'll just keep it as is or improve the callers.
-      
-      if (idToken != null && projectId.isNotEmpty) {
-        final url = 'https://fcm.googleapis.com/v1/projects/$projectId/messages:send';
-        await _dio.post(
-          url,
-          options: Options(headers: {'Authorization': 'Bearer $idToken'}),
-          data: {
-            'message': {
-              'topic': 'class_announcements', // Every app is subscribed to this topic
-              'notification': {
-                'title': '📅 $title',
-                'body':  body,
-              },
-              'android': {
-                'notification': {'channel_id': 'classmate_channel'},
-              },
-            },
-          },
-        ).then((res) => debugPrint('[FCM] Timetable broadcast sent: ${res.statusCode}'))
-         .catchError((e) => debugPrint('[FCM] Timetable broadcast failed: $e'));
-      }
+      // 2. Broadcast via FCM (Service Account Workaround)
+      await FcmServerService.sendNotification(
+        title: '📅 $title',
+        body:  body,
+        topic: AppStrings.fcmTopicTimetable,
+        data:  {'timetable': 'updated'},
+      );
     } catch (e) {
       debugPrint('[Timetable] Notification failed (non-fatal): $e');
     }

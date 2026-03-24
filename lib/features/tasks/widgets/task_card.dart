@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_sizes.dart';
 import '../../../core/utils/extensions.dart';
+import '../../../core/services/auth_service.dart';
 import '../../../shared/models/task_model.dart';
 import '../../../shared/widgets/app_chips.dart';
 import '../controllers/task_controller.dart';
@@ -18,11 +19,13 @@ class TaskCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isDark = context.isDark;
+    final isDark   = context.isDark;
+    final isAdmin  = ref.watch(isAdminProvider);
+    final isReadOnly = task.isClassTask && !isAdmin;
 
     return Dismissible(
       key:             Key('task_${task.id}'),
-      direction:       DismissDirection.endToStart,
+      direction:       isReadOnly ? DismissDirection.none : DismissDirection.endToStart,
       confirmDismiss:  (_) => _confirmDelete(context),
       onDismissed:     (_) =>
           ref.read(taskControllerProvider.notifier).deleteTask(task.id),

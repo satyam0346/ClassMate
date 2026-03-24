@@ -106,6 +106,8 @@ class _AddEditTaskScreenState extends ConsumerState<AddEditTaskScreen> {
     final isDark   = context.isDark;
     final isAdmin  = ref.watch(isAdminProvider);
     final crudState = ref.watch(taskControllerProvider);
+    
+    final isReadOnly = _isEdit && widget.existing!.isClassTask && !isAdmin;
 
     // Listen for save outcome
     ref.listen(taskControllerProvider, (_, next) {
@@ -149,7 +151,7 @@ class _AddEditTaskScreenState extends ConsumerState<AddEditTaskScreen> {
                       ),
                       Expanded(
                         child: Text(
-                          _isEdit ? 'Edit Task' : 'New Task',
+                          _isEdit ? (isReadOnly ? 'View Task' : 'Edit Task') : 'New Task',
                           style: const TextStyle(
                             color:      Colors.white,
                             fontSize:   22,
@@ -157,6 +159,12 @@ class _AddEditTaskScreenState extends ConsumerState<AddEditTaskScreen> {
                           ),
                         ),
                       ),
+                      if (_isEdit && !isReadOnly)
+                        IconButton(
+                          onPressed: _confirmDelete,
+                          icon: const Icon(Icons.delete_outline_rounded,
+                              color: Colors.white),
+                        ),
                     ],
                   ),
                 ).animate().fadeIn().slideX(begin: -0.05),
@@ -191,6 +199,7 @@ class _AddEditTaskScreenState extends ConsumerState<AddEditTaskScreen> {
                               controller: _titleCtrl,
                               prefixIcon: const Icon(Icons.task_alt_outlined),
                               maxLength:  200,
+                              enabled:    !isReadOnly,
                               validator:  (v) =>
                                   AppValidators.required(v, fieldName: 'Title'),
                             ),
@@ -203,6 +212,7 @@ class _AddEditTaskScreenState extends ConsumerState<AddEditTaskScreen> {
                               controller: _subjectCtrl,
                               prefixIcon: const Icon(Icons.book_outlined),
                               maxLength:  100,
+                              enabled:    !isReadOnly,
                             ),
                             const SizedBox(height: AppSizes.md),
 
@@ -213,6 +223,7 @@ class _AddEditTaskScreenState extends ConsumerState<AddEditTaskScreen> {
                               controller: _descCtrl,
                               prefixIcon: const Icon(Icons.notes_rounded),
                               maxLength:  1000,
+                              enabled:    !isReadOnly,
                               keyboardType: TextInputType.multiline,
                               textInputAction: TextInputAction.newline,
                             ),
@@ -222,7 +233,7 @@ class _AddEditTaskScreenState extends ConsumerState<AddEditTaskScreen> {
                             _SectionLabel('Due Date'),
                             const SizedBox(height: AppSizes.sm),
                             InkWell(
-                              onTap:        _pickDate,
+                              onTap: isReadOnly ? null : _pickDate,
                               borderRadius: BorderRadius.circular(AppSizes.radiusSm),
                               child: InputDecorator(
                                 decoration: InputDecoration(
@@ -263,7 +274,7 @@ class _AddEditTaskScreenState extends ConsumerState<AddEditTaskScreen> {
                                   value:    'high',
                                   selected: _priority == 'high',
                                   color:    AppColors.priorityHigh,
-                                  onTap:    () => setState(() => _priority = 'high'),
+                                  onTap: isReadOnly ? () {} : () => setState(() => _priority = 'high'),
                                 ),
                                 const SizedBox(width: AppSizes.sm),
                                 _PriorityButton(
@@ -271,7 +282,7 @@ class _AddEditTaskScreenState extends ConsumerState<AddEditTaskScreen> {
                                   value:    'medium',
                                   selected: _priority == 'medium',
                                   color:    AppColors.priorityMedium,
-                                  onTap:    () => setState(() => _priority = 'medium'),
+                                  onTap: isReadOnly ? () {} : () => setState(() => _priority = 'medium'),
                                 ),
                                 const SizedBox(width: AppSizes.sm),
                                 _PriorityButton(
@@ -279,7 +290,7 @@ class _AddEditTaskScreenState extends ConsumerState<AddEditTaskScreen> {
                                   value:    'low',
                                   selected: _priority == 'low',
                                   color:    AppColors.priorityLow,
-                                  onTap:    () => setState(() => _priority = 'low'),
+                                  onTap: isReadOnly ? () {} : () => setState(() => _priority = 'low'),
                                 ),
                               ],
                             ),
@@ -335,23 +346,24 @@ class _AddEditTaskScreenState extends ConsumerState<AddEditTaskScreen> {
                             const SizedBox(height: AppSizes.xl),
 
                             // Save button
-                            SizedBox(
-                              width:  double.infinity,
-                              height: 52,
-                              child: ElevatedButton(
-                                onPressed: crudState.isSaving ? null : _submit,
-                                child: crudState.isSaving
-                                    ? const SizedBox(
-                                        width: 22, height: 22,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2.5,
-                                          color: Colors.white,
-                                        ),
-                                      )
-                                    : Text(
-                                        _isEdit ? 'Update Task' : 'Add Task'),
+                            if (!isReadOnly)
+                              SizedBox(
+                                width:  double.infinity,
+                                height: 52,
+                                child: ElevatedButton(
+                                  onPressed: crudState.isSaving ? null : _submit,
+                                  child: crudState.isSaving
+                                      ? const SizedBox(
+                                          width: 22, height: 22,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2.5,
+                                            color: Colors.white,
+                                          ),
+                                        )
+                                      : Text(
+                                          _isEdit ? 'Update Task' : 'Add Task'),
+                                ),
                               ),
-                            ),
                           ],
                         ),
                       ),
@@ -426,5 +438,32 @@ class _PriorityButton extends StatelessWidget {
             ),
           ),
         ),
-      );
+  }
+
+  Future<void> _confirmDelete() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title:   const Text('Delete Task?'),
+        content: const Text('This action cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.error),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && widget.existing != null) {
+      ref.read(taskControllerProvider.notifier).deleteTask(widget.existing!.id);
+      if (mounted) context.pop(); // Close add/edit screen after deletion
+    }
+  }
 }

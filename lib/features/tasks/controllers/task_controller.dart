@@ -6,6 +6,8 @@ import '../../../core/services/auth_service.dart';
 import '../../../core/services/firestore_service.dart';
 import '../../../core/utils/input_sanitizer.dart';
 import '../../../shared/models/task_model.dart';
+import '../../../core/services/fcm_server_service.dart';
+import '../../../core/constants/app_strings.dart';
 
 // ── Filter enum ───────────────────────────────────────────────
 
@@ -62,6 +64,7 @@ final tasksStreamProvider = StreamProvider<List<TaskModel>>((ref) {
 
   final db = FirebaseFirestore.instance;
   final ctrl = StreamController<List<TaskModel>>();
+  final isAdmin = ref.read(isAdminProvider);
 
   List<TaskModel> classTasks    = [];
   List<TaskModel> personalTasks = [];
@@ -91,8 +94,24 @@ final tasksStreamProvider = StreamProvider<List<TaskModel>>((ref) {
       finalTasks.add(pt);
     }
 
+    // Auto-delete tasks that ended > 1 week ago
+    final now = DateTime.now();
+    final weekAgo = now.subtract(const Duration(days: 7));
+    final displayTasks = <TaskModel>[];
+
+    for (final task in finalTasks) {
+      if (task.dueDate.isBefore(weekAgo)) {
+        // Task has ended > 1 week ago. Attempt to delete if we have permission
+        if (!task.isClassTask || isAdmin) {
+          db.collection('tasks').doc(task.id).delete().catchError((_) {});
+        }
+      } else {
+        displayTasks.add(task);
+      }
+    }
+
     // Sort by due date
-    final sorted = finalTasks..sort((a, b) => a.dueDate.compareTo(b.dueDate));
+    final sorted = displayTasks..sort((a, b) => a.dueDate.compareTo(b.dueDate));
     ctrl.add(sorted);
   }
 
@@ -213,8 +232,18 @@ class TaskController extends StateNotifier<TaskCrudState> {
         isClassTask: isClassTask,
         createdAt:   DateTime.now(),
       );
-      await _fs.add('tasks', task.toFirestore());
+      final ref = await _fs.add('tasks', task.toFirestore());
       state = state.copyWith(isSaving: false, success: true);
+
+      // Send FCM notification if it's a class task
+      if (isClassTask) {
+        await FcmServerService.sendNotification(
+          title: 'New Class Task: ${task.title}',
+          body:  'Due: ${task.dueDate.toLocal().toString().split(' ')[0]} - ${task.subject}',
+          topic: AppStrings.fcmTopicTasks,
+          data:  {'taskId': ref.id},
+        );
+      }
     } catch (e) {
       state = state.copyWith(
           isSaving: false,
@@ -228,6 +257,16 @@ class TaskController extends StateNotifier<TaskCrudState> {
     try {
       await _fs.update('tasks/${task.id}', task.toFirestore());
       state = state.copyWith(isSaving: false, success: true);
+
+      // Send FCM notification if it's a class task
+      if (task.isClassTask) {
+        await FcmServerService.sendNotification(
+          title: 'Class Task Updated: ${task.title}',
+          body:  'Due: ${task.dueDate.toLocal().toString().split(' ')[0]} - ${task.subject}',
+          topic: AppStrings.fcmTopicTasks,
+          data:  {'taskId': task.id},
+        );
+      }
     } catch (e) {
       state = state.copyWith(
           isSaving: false,

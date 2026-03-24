@@ -108,6 +108,8 @@ class NotificationService {
     try {
       await _fcm.subscribeToTopic(AppStrings.fcmTopicAnnouncements);
       await _fcm.subscribeToTopic(AppStrings.fcmTopicMaterials);
+      await _fcm.subscribeToTopic(AppStrings.fcmTopicTasks);
+      await _fcm.subscribeToTopic(AppStrings.fcmTopicTimetable);
       debugPrint('[FCM] Subscribed to topics');
     } catch (e) {
       debugPrint('[FCM] Subscribe failed (non-fatal): $e');
@@ -118,6 +120,8 @@ class NotificationService {
     try {
       await _fcm.unsubscribeFromTopic(AppStrings.fcmTopicAnnouncements);
       await _fcm.unsubscribeFromTopic(AppStrings.fcmTopicMaterials);
+      await _fcm.unsubscribeFromTopic(AppStrings.fcmTopicTasks);
+      await _fcm.unsubscribeFromTopic(AppStrings.fcmTopicTimetable);
     } catch (e) {
       debugPrint('[FCM] Unsubscribe failed (non-fatal): $e');
     }
@@ -240,12 +244,13 @@ class NotificationService {
     // Determine payload based on data content
     final announcementId = message.data['announcementId'];
     final materialId     = message.data['materialId'];
+    final taskId         = message.data['taskId'];
 
     showNotification(
       id:      message.hashCode,
       title:   notification.title ?? 'ClassMate',
       body:    notification.body  ?? '',
-      payload: announcementId ?? materialId,
+      payload: announcementId ?? materialId ?? taskId,
     );
   }
 

@@ -105,8 +105,17 @@ class HomeTaskPreview extends ConsumerWidget {
                     children: [
                       Text(
                         task.title.truncate(50),
-                        style: context.textTheme.bodyMedium
-                            ?.copyWith(fontWeight: FontWeight.w600),
+                        style: context.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          decoration: task.status == 'done'
+                              ? TextDecoration.lineThrough
+                              : null,
+                          color: task.status == 'done'
+                              ? (isDark
+                                  ? AppColors.textSecondaryDark
+                                  : AppColors.textSecondaryLight)
+                              : null,
+                        ),
                       ),
                       if (task.subject.isNotEmpty)
                         Text(task.subject,
@@ -117,6 +126,35 @@ class HomeTaskPreview extends ConsumerWidget {
                 DueDateBadge(
                     dueDate: task.dueDate,
                     isOverdue: task.isOverdue),
+                const SizedBox(width: AppSizes.sm),
+                GestureDetector(
+                  onTap: () => ref
+                      .read(taskControllerProvider.notifier)
+                      .toggleStatus(task),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    width: 26,
+                    height: 26,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: task.status == 'done'
+                          ? AppColors.success
+                          : Colors.transparent,
+                      border: Border.all(
+                        color: task.status == 'done'
+                            ? AppColors.success
+                            : (isDark
+                                ? AppColors.dividerDark
+                                : AppColors.dividerLight),
+                        width: 2,
+                      ),
+                    ),
+                    child: task.status == 'done'
+                        ? const Icon(Icons.check_rounded,
+                            color: Colors.white, size: 14)
+                        : null,
+                  ),
+                ),
               ],
             ),
           ),

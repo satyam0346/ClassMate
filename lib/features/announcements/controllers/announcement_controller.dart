@@ -160,6 +160,14 @@ class AnnouncementController
         'attachmentUrl': a.attachmentUrl,
       });
       state = state.copyWith(isSaving: false, success: true);
+
+      // Send FCM directly from client using bundled Service Account (Serverless workaround)
+      await FcmServerService.sendNotification(
+        title:   'Announcement Updated: ${InputSanitizer.sanitizeTitle(a.title)}',
+        body:    _truncate(InputSanitizer.sanitizeDescription(a.message), 100),
+        topic:   AppStrings.fcmTopicAnnouncements,
+        data:    {'announcementId': a.id},
+      );
     } catch (e) {
       state = state.copyWith(
           isSaving: false,
