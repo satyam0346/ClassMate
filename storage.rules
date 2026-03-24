@@ -1,0 +1,80 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // ══════════════════════════════════════════════════════════
+    // Helper Functions
+    // ══════════════════════════════════════════════════════════
+
+    // Is the request from any authenticated user?
+    function isAuthed() {
+      return request.auth != null;
+    }
+
+    // Is the authenticated user an admin?
+    // Reads the user's Firestore document to check role.
+    function isAdmin() {
+      return isAuthed() &&
+        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // Block known executable / script file extensions.
+    function notExecutable() {
+      return !request.resource.name.matches(
+        '.*\\.(exe|sh|apk|msi|bat|cmd|ps1|vbs|jar|py|rb|php|pl|lua|bin|dmg|iso|run)$'
+      );
+    }
+
+    // File must be under 2MB.
+    function under2MB() {
+      return request.resource.size < 2 * 1024 * 1024;
+    }
+
+    // File must be under 50MB (for admin material uploads).
+    function under50MB() {
+      return request.resource.size < 50 * 1024 * 1024;
+    }
+
+    // ══════════════════════════════════════════════════════════
+    // /materials/**  — Admin uploads only, any authenticated user reads
+    // ══════════════════════════════════════════════════════════
+    match /materials/{allPaths=**} {
+      allow read: if isAuthed();
+      allow write: if isAdmin()
+        && notExecutable()
+        && under50MB();
+      allow delete: if isAdmin();
+    }
+
+    // ══════════════════════════════════════════════════════════
+    // /announcements/**  — Admin uploads only
+    // ══════════════════════════════════════════════════════════
+    match /announcements/{allPaths=**} {
+      allow read: if isAuthed();
+      allow write: if isAdmin()
+        && notExecutable()
+        && under50MB();
+      allow delete: if isAdmin();
+    }
+
+    // ══════════════════════════════════════════════════════════
+    // /profiles/{userId}/**  — Owner uploads only, all authenticated users read
+    //   Limits: 2MB max, no executable files
+    // ══════════════════════════════════════════════════════════
+    match /profiles/{userId}/{allPaths=**} {
+      allow read: if isAuthed();
+      allow write: if isAuthed()
+        && request.auth.uid == userId
+        && under2MB()
+        && notExecutable();
+      allow delete: if isAuthed() && request.auth.uid == userId;
+    }
+
+    // ══════════════════════════════════════════════════════════
+    // Deny everything else
+    // ══════════════════════════════════════════════════════════
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

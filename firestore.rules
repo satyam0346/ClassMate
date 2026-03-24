@@ -1,0 +1,209 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ══════════════════════════════════════════════════════════
+    // Helper Functions
+    // ══════════════════════════════════════════════════════════
+
+    // Is the request from any authenticated user?
+    function isAuthed() {
+      return request.auth != null;
+    }
+
+    // Is the authenticated user an admin?
+    // Reads the 'role' field from the caller's own user document.
+    function isAdmin() {
+      return isAuthed() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // Does the request come from the specified user?
+    function isOwner(uid) {
+      return isAuthed() && request.auth.uid == uid;
+    }
+
+    // Email must belong to an allowed university domain.
+    function validEmail(email) {
+      return email is string &&
+        email.matches('.*@(marwadiuniversity\\.ac\\.in|gmail\\.com)$');
+    }
+
+    // String field must be non-empty and within maxLen characters.
+    function validString(val, maxLen) {
+      return val is string && val.size() > 0 && val.size() <= maxLen;
+    }
+
+    // Optional string: if present must be within maxLen; if absent that's fine too.
+    function validOptionalString(val, maxLen) {
+      return val == null || (val is string && val.size() <= maxLen);
+    }
+
+    // Field must be a Firestore timestamp.
+    function validTimestamp(val) {
+      return val is timestamp;
+    }
+
+    // ══════════════════════════════════════════════════════════
+    // /users/{userId}
+    // ══════════════════════════════════════════════════════════
+    match /users/{userId} {
+
+      // Owner reads their own doc; admin reads any doc.
+      allow read: if isOwner(userId) || isAdmin();
+
+      // A new user can create their own document on registration.
+      // - Email must be from an allowed domain.
+      // - Role must be "student" — admin cannot be set via app.
+      // - Only known fields allowed.
+      allow create: if isOwner(userId)
+        && validEmail(request.resource.data.email)
+        && validString(request.resource.data.name, 100)
+        && validOptionalString(request.resource.data.phone, 15)
+        && validOptionalString(request.resource.data.classGroup, 50)
+        && validOptionalString(request.resource.data.section, 20)
+        && validOptionalString(request.resource.data.rollNo, 20)
+        && validOptionalString(request.resource.data.grNumber, 20)
+        && request.resource.data.role == 'student'
+        && validTimestamp(request.resource.data.createdAt)
+        && request.resource.data.keys().hasOnly([
+             'name', 'email', 'phone', 'classGroup', 'section',
+             'rollNo', 'grNumber', 'photoUrl', 'role', 'createdAt'
+           ]);
+
+      // Owner can update their profile but CANNOT change role, email, or createdAt.
+      allow update: if isOwner(userId)
+        && !request.resource.data.diff(resource.data).affectedKeys()
+             .hasAny(['role', 'email', 'createdAt'])
+        && validString(request.resource.data.name, 100)
+        && validString(request.resource.data.phone, 15);
+
+      // Only admin can update role or delete users.
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ══════════════════════════════════════════════════════════
+    // /tasks/{taskId}
+    // ══════════════════════════════════════════════════════════
+    match /tasks/{taskId} {
+
+      // Any authenticated user can read tasks (class tasks + own tasks).
+      allow read: if isAuthed();
+
+      // Any authenticated user can create a task.
+      // - isClassTask: only admin can create class-wide tasks.
+      // - createdBy must be the caller's own UID.
+      allow create: if isAuthed()
+        && validString(request.resource.data.title, 200)
+        && validString(request.resource.data.description, 1000)
+        && validString(request.resource.data.subject, 100)
+        && request.resource.data.priority in ['high', 'medium', 'low']
+        && request.resource.data.status in ['pending', 'in_progress', 'done']
+        && request.resource.data.createdBy == request.auth.uid
+        && validTimestamp(request.resource.data.dueDate)
+        && validTimestamp(request.resource.data.createdAt)
+        && (request.resource.data.isClassTask == false || isAdmin())
+        && request.resource.data.keys().hasOnly([
+             'title', 'description', 'dueDate', 'subject', 'priority',
+             'status', 'createdBy', 'isClassTask', 'createdAt'
+           ]);
+
+      // Owner or admin can update. PRotected immutable fields: createdBy, createdAt, isClassTask.
+      allow update: if isAuthed()
+        && (resource.data.createdBy == request.auth.uid || isAdmin())
+        && !request.resource.data.diff(resource.data).affectedKeys()
+             .hasAny(['createdBy', 'createdAt', 'isClassTask'])
+        && validString(request.resource.data.title, 200)
+        && validString(request.resource.data.description, 1000)
+        && request.resource.data.priority in ['high', 'medium', 'low']
+        && request.resource.data.status in ['pending', 'in_progress', 'done'];
+
+      // Owner or admin can delete.
+      allow delete: if isAuthed()
+        && (resource.data.createdBy == request.auth.uid || isAdmin());
+    }
+
+    // ══════════════════════════════════════════════════════════
+    // /exams/{examId}
+    // ══════════════════════════════════════════════════════════
+    match /exams/{examId} {
+      allow read: if isAuthed();
+
+      allow create: if isAuthed()
+        && validString(request.resource.data.subject, 100)
+        && validTimestamp(request.resource.data.examDate)
+        && validOptionalString(request.resource.data.venue, 200)
+        && validOptionalString(request.resource.data.notes, 500)
+        && request.resource.data.createdBy == request.auth.uid
+        && (request.resource.data.isOfficial == false || isAdmin())
+        && request.resource.data.keys().hasOnly([
+             'subject', 'examDate', 'venue', 'notes', 'createdBy', 'isOfficial'
+           ]);
+
+      // Admin can update/delete any exam.
+      // Non-admin can update/delete only their own personal (non-official) exams.
+      allow update, delete: if isAdmin()
+        || (isAuthed()
+           && resource.data.createdBy == request.auth.uid
+           && resource.data.isOfficial == false);
+    }
+
+    // ══════════════════════════════════════════════════════════
+    // /timetable/{dayId}
+    // ══════════════════════════════════════════════════════════
+    match /timetable/{dayId} {
+      allow read: if isAuthed();
+
+      // Only admin can write timetable.
+      allow write: if isAdmin()
+        && request.resource.data.day in [
+             'Monday', 'Tuesday', 'Wednesday',
+             'Thursday', 'Friday', 'Saturday'
+           ]
+        && request.resource.data.slots is list
+        && request.resource.data.keys().hasOnly(['day', 'slots']);
+    }
+
+    // ══════════════════════════════════════════════════════════
+    // /announcements/{announcementId}
+    // ══════════════════════════════════════════════════════════
+    match /announcements/{announcementId} {
+      allow read: if isAuthed();
+
+      // Only admin can post/update announcements.
+      allow create, update: if isAdmin()
+        && validString(request.resource.data.title, 200)
+        && validString(request.resource.data.message, 2000)
+        && request.resource.data.keys().hasAll([
+             'title', 'message', 'createdAt', 'createdBy'
+           ]);
+
+      allow delete: if isAdmin();
+    }
+
+    // ══════════════════════════════════════════════════════════
+    // /materials/{materialId}
+    // ══════════════════════════════════════════════════════════
+    match /materials/{materialId} {
+      allow read: if isAuthed();
+
+      // Only admin can upload/update materials.
+      allow create, update: if isAdmin()
+        && validString(request.resource.data.title, 200)
+        && validString(request.resource.data.subject, 100)
+        && request.resource.data.keys().hasAll([
+             'title', 'subject', 'fileType', 'url', 'uploadedBy', 'uploadedAt'
+           ]);
+
+      allow delete: if isAdmin();
+    }
+
+    // ══════════════════════════════════════════════════════════
+    // Deny all other paths by default
+    // ══════════════════════════════════════════════════════════
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

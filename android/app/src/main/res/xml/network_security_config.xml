@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Network Security Configuration for ClassMate
+  ─────────────────────────────────────────────
+  - Blocks ALL cleartext (plain HTTP) traffic
+  - Requires HTTPS for all connections
+  - Applies to API level 24+ (Android 7.0+)
+
+  Reference this file in AndroidManifest.xml:
+  android:networkSecurityConfig="@xml/network_security_config"
+-->
+<network-security-config>
+
+  <!--
+    Default policy: HTTPS only for all domains.
+    cleartextTrafficPermitted="false" blocks any unencrypted HTTP connection.
+    An uncaught attempt to connect via HTTP will throw an IOException.
+  -->
+  <base-config cleartextTrafficPermitted="false">
+    <trust-anchors>
+      <!-- Trust system CA store (includes Google/Firebase CAs) -->
+      <certificates src="system" />
+    </trust-anchors>
+  </base-config>
+
+  <!--
+    Firebase domains — explicitly configured for clarity,
+    though the base-config above already covers them.
+    Firebase SDK enforces TLS 1.2+ internally.
+  -->
+  <domain-config cleartextTrafficPermitted="false">
+    <domain includeSubdomains="true">firebaseapp.com</domain>
+    <domain includeSubdomains="true">firebaseio.com</domain>
+    <domain includeSubdomains="true">googleapis.com</domain>
+    <domain includeSubdomains="true">google.com</domain>
+    <domain includeSubdomains="true">fcm.googleapis.com</domain>
+    <trust-anchors>
+      <certificates src="system" />
+    </trust-anchors>
+  </domain-config>
+
+</network-security-config>
