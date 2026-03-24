@@ -377,6 +377,33 @@ class _AddEditTaskScreenState extends ConsumerState<AddEditTaskScreen> {
       ),
     );
   }
+
+  Future<void> _confirmDelete() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title:   const Text('Delete Task?'),
+        content: const Text('This action cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.error),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && widget.existing != null) {
+      ref.read(taskControllerProvider.notifier).deleteTask(widget.existing!.id);
+      if (mounted) context.pop();
+    }
+  }
 }
 
 // ── Helper widgets ────────────────────────────────────────────
@@ -438,32 +465,5 @@ class _PriorityButton extends StatelessWidget {
             ),
           ),
         ),
-  }
-
-  Future<void> _confirmDelete() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title:   const Text('Delete Task?'),
-        content: const Text('This action cannot be undone.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.error),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true && widget.existing != null) {
-      ref.read(taskControllerProvider.notifier).deleteTask(widget.existing!.id);
-      if (mounted) context.pop(); // Close add/edit screen after deletion
-    }
-  }
+      );
 }
