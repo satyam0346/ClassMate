@@ -8,6 +8,7 @@ import '../../../core/services/auth_service.dart';
 import '../../../core/utils/extensions.dart';
 import '../../../features/tasks/controllers/task_controller.dart';
 import '../../../features/exams/controllers/exam_controller.dart';
+import '../../../features/mcq/providers/mcq_feature_provider.dart';
 import '../../../shared/widgets/loading_shimmer.dart';
 import '../widgets/greeting_card.dart';
 import '../widgets/home_task_preview.dart';
@@ -15,6 +16,7 @@ import '../widgets/home_announcement_preview.dart';
 import '../widgets/home_timetable_card.dart';
 import '../widgets/home_exam_countdown_card.dart';
 import '../widgets/home_materials_preview.dart';
+import '../widgets/home_mcq_card.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -26,6 +28,7 @@ class HomeScreen extends ConsumerWidget {
     final pendingCount = ref.watch(pendingTaskCountProvider);
     final overdueCount = ref.watch(overdueTaskCountProvider);
     final examCount    = ref.watch(upcomingExamCountProvider);
+    final mcqEnabled   = ref.watch(mcqFeatureEnabledProvider);
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.backgroundDark : AppColors.backgroundLight,
@@ -159,6 +162,19 @@ class HomeScreen extends ConsumerWidget {
                       .animate()
                       .fadeIn(delay: 320.ms),
                   const SizedBox(height: AppSizes.lg),
+
+                  // ── BES MCQ Practice card (Remote Config gated) ─────
+                  if (mcqEnabled) ...[
+                    _SectionHeader(
+                      title:  'BES Practice',
+                      seeAll: () => context.go('/home/mcq'),
+                    ).animate().fadeIn(delay: 195.ms),
+                    const SizedBox(height: AppSizes.sm),
+                    const HomeMcqCard()
+                        .animate()
+                        .fadeIn(delay: 220.ms),
+                    const SizedBox(height: AppSizes.lg),
+                  ],
 
                   // ── Recent materials preview ─────────────────────
                   _SectionHeader(

@@ -8,6 +8,7 @@ import '../../core/services/notification_service.dart';
 import '../widgets/offline_banner.dart';
 import '../../features/timetable/controllers/timetable_controller.dart';
 import '../../features/timetable/screens/timetable_screen.dart';
+import '../../features/mcq/providers/mcq_feature_provider.dart';
 
 /// Main app shell — wraps all bottom-nav routes.
 /// Passed as the [builder] of go_router's ShellRoute.
@@ -21,8 +22,8 @@ class AppShell extends ConsumerWidget {
     required this.location,
   });
 
-  // ── Tab config ────────────────────────────────────────────
-  static const _tabs = [
+  // ── Static tab config ─────────────────────────────────
+  static const _staticTabs = [
     _TabItem(route: '/home/dashboard',     icon: Icons.home_outlined,          activeIcon: Icons.home_rounded,          label: 'Home'),
     _TabItem(route: '/home/tasks',         icon: Icons.task_alt_outlined,       activeIcon: Icons.task_alt_rounded,      label: 'Tasks'),
     _TabItem(route: '/home/timetable',     icon: Icons.calendar_month_outlined, activeIcon: Icons.calendar_month_rounded,label: 'Timetable'),
@@ -30,18 +31,34 @@ class AppShell extends ConsumerWidget {
     _TabItem(route: '/home/profile',       icon: Icons.person_outline,          activeIcon: Icons.person_rounded,        label: 'Profile'),
   ];
 
-  int get _selectedIndex {
-    for (var i = 0; i < _tabs.length; i++) {
-      if (location.startsWith(_tabs[i].route)) return i;
+  // Pre-built tab lists — avoids allocating a new List on every build
+  static final _tabsWithMcq = const [
+    _TabItem(route: '/home/dashboard',     icon: Icons.home_outlined,          activeIcon: Icons.home_rounded,          label: 'Home'),
+    _TabItem(route: '/home/tasks',         icon: Icons.task_alt_outlined,       activeIcon: Icons.task_alt_rounded,      label: 'Tasks'),
+    _TabItem(route: '/home/timetable',     icon: Icons.calendar_month_outlined, activeIcon: Icons.calendar_month_rounded,label: 'Timetable'),
+    _TabItem(route: '/home/mcq',           icon: Icons.psychology_outlined,     activeIcon: Icons.psychology_rounded,    label: 'Quiz'),
+    _TabItem(route: '/home/materials',     icon: Icons.folder_outlined,         activeIcon: Icons.folder_rounded,        label: 'Materials'),
+    _TabItem(route: '/home/profile',       icon: Icons.person_outline,          activeIcon: Icons.person_rounded,        label: 'Profile'),
+  ];
+
+  List<_TabItem> _getTabs(bool mcqEnabled) =>
+      mcqEnabled ? _tabsWithMcq : _staticTabs;
+
+  int _getSelectedIndex(List<_TabItem> tabs) {
+    for (var i = 0; i < tabs.length; i++) {
+      if (location.startsWith(tabs[i].route)) return i;
     }
     return 0;
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isDark   = Theme.of(context).brightness == Brightness.dark;
-    final isAdmin  = ref.watch(isAdminProvider);
-    final selIndex = _selectedIndex;
+    final isDark      = Theme.of(context).brightness == Brightness.dark;
+    // select() prevents full shell rebuild — only rebuilds when admin status flips
+    final isAdmin     = ref.watch(isAdminProvider.select((v) => v));
+    final mcqEnabled  = ref.watch(mcqFeatureEnabledProvider);
+    final tabs        = _getTabs(mcqEnabled);
+    final selIndex    = _getSelectedIndex(tabs);
 
     // Core listener to keep native repeating notifications perfectly synced with Firestore
     ref.listen(timetableStreamProvider, (_, next) {
@@ -72,8 +89,8 @@ class AppShell extends ConsumerWidget {
           child: SizedBox(
             height: AppSizes.bottomNavHeight,
             child: Row(
-              children: List.generate(_tabs.length, (i) {
-                final tab      = _tabs[i];
+              children: List.generate(tabs.length, (i) {
+                final tab      = tabs[i];
                 final selected = i == selIndex;
                 return Expanded(
                   child: _NavItem(

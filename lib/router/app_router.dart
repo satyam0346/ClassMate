@@ -26,6 +26,7 @@ import '../features/admin/screens/view_all_profiles_screen.dart';
 import '../shared/models/announcement_model.dart';
 import '../shared/models/task_model.dart';
 import '../shared/widgets/app_shell.dart';
+import '../features/mcq/screens/mcq_screen.dart';
 
 /// Auth change notifier — triggers go_router refresh on auth state change.
 class _AuthChangeNotifier extends ChangeNotifier {
@@ -51,7 +52,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
 
   return GoRouter(
     initialLocation:     '/splash',
-    debugLogDiagnostics: true,
+    debugLogDiagnostics: false,
     refreshListenable:   authNotifier,
 
     // ── Auth redirect guard ──────────────────────────────────
@@ -175,6 +176,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             path:    '/home/timetable',
             name:    'timetable',
             builder: (_, __) => const TimetableScreen(),
+          ),
+
+          // ── BES MCQ Practice (Remote Config gated) ─────────────────
+          GoRoute(
+            path:    '/home/mcq',
+            name:    'mcq',
+            builder: (_, __) => const McqScreen(),
           ),
 
 

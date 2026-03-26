@@ -15,14 +15,11 @@ class HomeTaskPreview extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final tasksAsync = ref.watch(tasksStreamProvider);
-    final preview    = ref.watch(upcomingTasksPreviewProvider);
     final isDark     = context.isDark;
 
-    if (tasksAsync.isLoading) {
-      return const TaskShimmerList(count: 3);
-    }
-    if (tasksAsync.hasError) {
-      return Container(
+    return tasksAsync.when(
+      loading: () => const TaskShimmerList(count: 3),
+      error:   (_, __) => Container(
         width: double.infinity,
         padding: const EdgeInsets.all(AppSizes.lg),
         decoration: BoxDecoration(
@@ -39,10 +36,11 @@ class HomeTaskPreview extends ConsumerWidget {
             Text('Could not load tasks.', textAlign: TextAlign.center),
           ],
         ),
-      );
-    }
-    if (preview.isEmpty) {
-      return Container(
+      ),
+      data: (_) {
+        final preview = ref.watch(upcomingTasksPreviewProvider);
+        if (preview.isEmpty) {
+          return Container(
         width:   double.infinity,
         padding: const EdgeInsets.all(AppSizes.lg),
         decoration: BoxDecoration(
@@ -63,112 +61,113 @@ class HomeTaskPreview extends ConsumerWidget {
       );
     }
 
-    return Column(
-      children: [
-        for (final task in preview)
-          Container(
-            margin:  const EdgeInsets.only(bottom: AppSizes.sm),
-            padding: const EdgeInsets.all(AppSizes.md),
-            decoration: BoxDecoration(
-              color: isDark ? AppColors.cardDark : AppColors.cardLight,
-              borderRadius: BorderRadius.circular(AppSizes.radiusLg),
-              border: Border.all(
-                color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color:      Colors.black.withOpacity(0.03),
-                  blurRadius: 6,
-                  offset:     const Offset(0, 1),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                // Left: priority indicator dot
-                Container(
-                  width:  10,
-                  height: 10,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: switch (task.priority) {
-                      'high'   => AppColors.priorityHigh,
-                      'medium' => AppColors.priorityMedium,
-                      _        => AppColors.priorityLow,
-                    },
+        return Column(
+          children: [
+            for (final task in preview)
+              Container(
+                margin:  const EdgeInsets.only(bottom: AppSizes.sm),
+                padding: const EdgeInsets.all(AppSizes.md),
+                decoration: BoxDecoration(
+                  color: isDark ? AppColors.cardDark : AppColors.cardLight,
+                  borderRadius: BorderRadius.circular(AppSizes.radiusLg),
+                  border: Border.all(
+                    color: isDark ? AppColors.dividerDark : AppColors.dividerLight,
                   ),
+                  boxShadow: [
+                    BoxShadow(
+                      color:      Colors.black.withOpacity(0.03),
+                      blurRadius: 6,
+                      offset:     const Offset(0, 1),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: AppSizes.sm),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        task.title.truncate(50),
-                        style: context.textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                          decoration: task.status == 'done'
-                              ? TextDecoration.lineThrough
-                              : null,
-                          color: task.status == 'done'
-                              ? (isDark
-                                  ? AppColors.textSecondaryDark
-                                  : AppColors.textSecondaryLight)
-                              : null,
-                        ),
-                      ),
-                      if (task.subject.isNotEmpty)
-                        Text(task.subject,
-                            style: context.textTheme.bodySmall),
-                    ],
-                  ),
-                ),
-                DueDateBadge(
-                    dueDate: task.dueDate,
-                    isOverdue: task.isOverdue),
-                const SizedBox(width: AppSizes.sm),
-                GestureDetector(
-                  onTap: () => ref
-                      .read(taskControllerProvider.notifier)
-                      .toggleStatus(task),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    width: 26,
-                    height: 26,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: task.status == 'done'
-                          ? AppColors.success
-                          : Colors.transparent,
-                      border: Border.all(
-                        color: task.status == 'done'
-                            ? AppColors.success
-                            : (isDark
-                                ? AppColors.dividerDark
-                                : AppColors.dividerLight),
-                        width: 2,
+                child: Row(
+                  children: [
+                    Container(
+                      width:  10,
+                      height: 10,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: switch (task.priority) {
+                          'high'   => AppColors.priorityHigh,
+                          'medium' => AppColors.priorityMedium,
+                          _        => AppColors.priorityLow,
+                        },
                       ),
                     ),
-                    child: task.status == 'done'
-                        ? const Icon(Icons.check_rounded,
-                            color: Colors.white, size: 14)
-                        : null,
-                  ),
+                    const SizedBox(width: AppSizes.sm),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            task.title.truncate(50),
+                            style: context.textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                              decoration: task.status == 'done'
+                                  ? TextDecoration.lineThrough
+                                  : null,
+                              color: task.status == 'done'
+                                  ? (isDark
+                                      ? AppColors.textSecondaryDark
+                                      : AppColors.textSecondaryLight)
+                                  : null,
+                            ),
+                          ),
+                          if (task.subject.isNotEmpty)
+                            Text(task.subject,
+                                style: context.textTheme.bodySmall),
+                        ],
+                      ),
+                    ),
+                    DueDateBadge(
+                        dueDate: task.dueDate,
+                        isOverdue: task.isOverdue),
+                    const SizedBox(width: AppSizes.sm),
+                    GestureDetector(
+                      onTap: () => ref
+                          .read(taskControllerProvider.notifier)
+                          .toggleStatus(task),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        width: 26,
+                        height: 26,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: task.status == 'done'
+                              ? AppColors.success
+                              : Colors.transparent,
+                          border: Border.all(
+                            color: task.status == 'done'
+                                ? AppColors.success
+                                : (isDark
+                                    ? AppColors.dividerDark
+                                    : AppColors.dividerLight),
+                            width: 2,
+                          ),
+                        ),
+                        child: task.status == 'done'
+                            ? const Icon(Icons.check_rounded,
+                                color: Colors.white, size: 14)
+                            : null,
+                      ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
+            TextButton(
+              onPressed: () => context.go('/home/tasks'),
+              child: Text(
+                'View all tasks →',
+                style: TextStyle(
+                  color:      isDark ? AppColors.accent : AppColors.primary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
-          ),
-        TextButton(
-          onPressed: () => context.go('/home/tasks'),
-          child: Text(
-            'View all tasks →',
-            style: TextStyle(
-              color:      isDark ? AppColors.accent : AppColors.primary,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-      ],
+          ],
+        );
+      },
     );
   }
 }

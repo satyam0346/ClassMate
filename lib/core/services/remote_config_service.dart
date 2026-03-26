@@ -21,6 +21,11 @@ class RemoteConfigService {
   String  get allowedDomains  => _config.getString('allowed_email_domains');
   String  get superAdmins     => _config.getString('super_admins');
 
+  // ── Feature flags ───────────────────────────────────────────
+  /// Controls BES MCQ Practice visibility WITHOUT an app update.
+  /// Set to true in Firebase Remote Config console to enable instantly.
+  bool    get mcqBesEnabled   => _config.getBool('mcq_bes_enabled');
+
   /// Initialize Remote Config with defaults and fetch from server.
   Future<void> init() async {
     try {
@@ -35,6 +40,8 @@ class RemoteConfigService {
         'apk_download_url':      '',
         'allowed_email_domains': '@marwadiuniversity.ac.in,@gmail.com',
         'super_admins':          '',
+        // Feature flags — all OFF by default, toggle in Firebase Console
+        'mcq_bes_enabled':       false,
       });
 
       // Cache expiry: 1 hour in production, 0 in debug for fast iteration
